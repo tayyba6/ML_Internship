@@ -1,4 +1,4 @@
-Capstone Report —
+
 # Capstone Report — Google Search Ranking & Discoverability
 
 - **Author:** Tayyba Ghaffar
@@ -68,10 +68,12 @@ For the seed-42 split:
 - Test-set decline rate: **68.31%**
 Precision@K was chosen because the practical decision is to inspect a limited number of pages first. Average Precision was also used to evaluate the overall quality of the ranking.
 On the same held-out test set:
-| Metric            | Baseline | Decision Tree |
-| Precision@20      | 70%      | **80%**       |
-| Precision@50      | 64%      | **92%**       |
-| Average Precision | 0.6808   | **0.7388**    |
+
+| Metric | Baseline | Decision Tree |
+|---|---:|---:|
+| Precision@20 | 70% | **80%** |
+| Precision@50 | 64% | **92%** |
+| Average Precision | 0.6808 | **0.7388** |
 The model improved Precision@20 by 10 percentage points and Precision@50 by 28 percentage points relative to the baseline. Average Precision improved by 0.0580.
 The model's ranking was also tested across five client-grouped holdouts using seeds 42, 7, 21, 99, and 123. Mean Precision@50 was **92.8%** for the model compared with **66.4%** for the baseline, an average improvement of **26.4 percentage points**. The model outperformed the baseline on all five splits.
 ### Error analysis
@@ -82,19 +84,21 @@ The error analysis also showed that the decision tree produces a small number of
 ## 6. Interpretation
 
 The learned tree relied primarily on two of the four available features:
-| Feature                 | Tree feature importance |
-| `gsc_ctr_march`         | 63.1% |
+| Feature | Tree feature importance |
+|---|---:|
+| `gsc_ctr_march` | 63.1% |
 | `gsc_impressions_march` | 36.9% |
-| `gsc_avg_position_march`| 0.0% |
-| `ga4_sessions_march`    | 0.0% |
+| `gsc_avg_position_march` | 0.0% |
+| `ga4_sessions_march` | 0.0% |
 The model therefore did not use average position or GA4 sessions in its learned splits, despite these features being available. This is a useful negative result: adding a feature to the modeling frame does not guarantee that the fitted model will find it useful.
 The learned model also did not simply reproduce the hand-built baseline. The baseline explicitly combined impressions, CTR, and average position, while the learned tree relied on CTR and impressions. This suggests that the learned ranking found a different weighting of the available signals.
 The priority-tier analysis showed an ordered relationship between model priority and observed April decline rate:
 | Priority tier | Pages | Observed decline rate |
-| Lower         | 261   | 51.7% |
-| Medium        | 3,680 | 65.3% |
-| High          | 903   | 79.6% |
-| Highest       | 218   | 92.2% |
+|---|---:|---:|
+| Lower | 261 | 51.7% |
+| Medium | 3,680 | 65.3% |
+| High | 903 | 79.6% |
+| Highest | 218 | 92.2% |
 The increasing decline rate across tiers supports the use of the model as a prioritization signal.
 However, these relationships are observational. Feature importance does not establish causation, and the model does not show that changing CTR or impressions would cause a page's future performance to change.
 
@@ -102,7 +106,7 @@ However, these relationships are observational. Feature importance does not esta
 
 The recommended workflow is to use the learned model as a triage layer before human editorial review.
 ### Highest priority
-Review pages at the top of the ranked queue first. The highest model tier contained 218 test pages with an observed decline rate of 92.2%. These pages should be inspected for possible content-quality, search-intent, relevance, or recent-performance issues.
+Review pages at the top of the ranked queue first. In the seed-42 held-out test set, the highest model tier contained 218 pages with an observed decline rate of 92.2%. These pages should be inspected for possible content-quality, search-intent, relevance, or recent-performance issues.
 ### High priority
 Review the next group of highly ranked pages after the highest-priority queue. The observed decline rate for this tier was 79.6%.
 ### Medium priority
