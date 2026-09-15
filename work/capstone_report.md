@@ -8,7 +8,7 @@
 ## 1. Problem framing
 
 The capstone supports a content-review prioritization decision: which pages should be reviewed first for possible content improvement using signals available before the review decision.
-The unit of analysis is a page within a client, represented by the combination of `client_hash_id` and `content_hash_id`. The output is a ranked review queue, where pages are ordered by their learned decline probability and can also be grouped into priority tiers.
+The unit of analysis is a page within a client, represented by the combination of `client_hash_id` and `content_hash_id`. The output is a ranked review queue, where pages are ordered by their learned model score and can also be grouped into priority tiers.
 A FlyRank editor could use the queue to decide which pages to inspect first for possible content-quality, search-intent, or performance issues. The model is intended to support human review rather than automatically recommend or apply content changes.
 The cost of a wrong call is asymmetric. A false positive sends an editor to review a page that may not have experienced a decline, consuming review time. A false negative can cause a page experiencing a decline to be missed or reviewed later. Because editorial review capacity is limited, improving the ordering of the highest-priority pages is more useful than trying to classify every page perfectly.
 Data and ML help because the dataset contains many page-level observations and multiple pre-decision search-performance signals. A learned model can identify combinations of these signals and produce a consistent ranking that can be compared with a transparent rule-based baseline.
@@ -74,6 +74,7 @@ On the same held-out test set:
 | Precision@20 | 70% | **80%** |
 | Precision@50 | 64% | **92%** |
 | Average Precision | 0.6808 | **0.7388** |
+
 The model improved Precision@20 by 10 percentage points and Precision@50 by 28 percentage points relative to the baseline. Average Precision improved by 0.0580.
 The model's ranking was also tested across five client-grouped holdouts using seeds 42, 7, 21, 99, and 123. Mean Precision@50 was **92.8%** for the model compared with **66.4%** for the baseline, an average improvement of **26.4 percentage points**. The model outperformed the baseline on all five splits.
 ### Error analysis
@@ -84,21 +85,26 @@ The error analysis also showed that the decision tree produces a small number of
 ## 6. Interpretation
 
 The learned tree relied primarily on two of the four available features:
+
 | Feature | Tree feature importance |
 |---|---:|
-| `gsc_ctr_march` | 63.1% |
-| `gsc_impressions_march` | 36.9% |
+| `gsc_ctr_march` | 60.4% |
+| `gsc_impressions_march` | 39.6% |
 | `gsc_avg_position_march` | 0.0% |
 | `ga4_sessions_march` | 0.0% |
+
 The model therefore did not use average position or GA4 sessions in its learned splits, despite these features being available. This is a useful negative result: adding a feature to the modeling frame does not guarantee that the fitted model will find it useful.
 The learned model also did not simply reproduce the hand-built baseline. The baseline explicitly combined impressions, CTR, and average position, while the learned tree relied on CTR and impressions. This suggests that the learned ranking found a different weighting of the available signals.
-The priority-tier analysis showed an ordered relationship between model priority and observed April decline rate:
+This was also a useful negative result: although average position was included because the earlier signal audit identified it as relevant, the final tree did not use it in any split. This shows that a feature can appear useful during exploratory analysis without necessarily improving the fitted model.
+The priority-tier analysis on the seed-42 held-out test set showed an ordered relationship between model priority and observed April decline rate:
+
 | Priority tier | Pages | Observed decline rate |
 |---|---:|---:|
 | Lower | 261 | 51.7% |
 | Medium | 3,680 | 65.3% |
 | High | 903 | 79.6% |
 | Highest | 218 | 92.2% |
+
 The increasing decline rate across tiers supports the use of the model as a prioritization signal.
 However, these relationships are observational. Feature importance does not establish causation, and the model does not show that changing CTR or impressions would cause a page's future performance to change.
 
@@ -117,18 +123,26 @@ A FlyRank editor could therefore use the output as a ranked work queue: start wi
 The model should not automatically trigger content changes. Human review remains necessary because a measured click decline does not establish its cause and may reflect factors outside the page itself.
 Confidence in the ranking result is supported by the improvement over the transparent baseline and by consistent improvement across five client-grouped holdouts. However, the result should not be treated as production-ready or as a guarantee for every future client.
 The analysis is based on a March feature window and an April outcome window, so temporal generalization to other periods has not been fully tested. Client-level decline rates also vary substantially, which means performance may differ across clients.
+The final artifact is `work/outputs/capstone_final_ranked_review_queue.csv`. It contains 68,837 eligible pages ranked by the final model score. Each row includes hashed client and content identifiers, the model score, a priority tier, explanation labels based on the signals used by the final model, and the March search-performance signals used for interpretation.
+The queue is intended as a triage layer before human editorial review. Highest-priority pages can be reviewed first, followed by High, Medium, and Lower priority pages. The model does not automatically change content or claim that a page will definitely decline.
 
 ## 8. Reproducibility
 
 The analysis was developed in the `work/notebooks/capstone.ipynb` notebook using Python, DuckDB, pandas, NumPy, and scikit-learn.
 The model uses a fixed random seed of `42` for the primary client-grouped holdout and for the Decision Tree. Robustness testing used client-grouped holdouts with seeds:
-`42, 7, 21, 99, 123`
+`42, 7, 21, 99, 123`.
 The primary model configuration was:
 - `DecisionTreeClassifier(max_depth=3, random_state=42)`
 - `SimpleImputer(strategy="median")`
 The feature frame was constructed from the FlyRank internship warehouse, with March 2026 used as the feature window and April 2026 used as the outcome window.
 The Hugging Face access token is stored in Google Colab Secrets and is not written into the notebook or report.
-The final analysis should be rerun from the beginning of `work/notebooks/capstone.ipynb` before submission so that the reported numbers are confirmed against the current notebook outputs.
+The evaluation artifact is:
+`work/outputs/capstone_ranked_review_queue.csv`
+This artifact contains the seed-42 held-out test set used for the demonstrated ranking evaluation.
+The final artifact is:
+`work/outputs/capstone_final_ranked_review_queue.csv`
+This artifact contains all 68,837 eligible pages after the model was evaluated and then refit on the full eligible population. It is the final ranked content-review queue produced by the capstone workflow.
+To reproduce the analysis, open `work/notebooks/capstone.ipynb` in Google Colab, connect the repository, provide the Hugging Face token through Colab Secrets, and run the notebook from beginning to end. The notebook should be rerun before submission so that the reported numbers and generated artifacts are confirmed against the current notebook outputs.
 
 ## Claims checklist
 
@@ -139,4 +153,4 @@ The final analysis should be rerun from the beginning of `work/notebooks/capston
 - The model is not described as predicting Google's ranking algorithm.
 - Hashed identifiers are used only for grouping and row identification, not as model features.
 - Client-identifying information, URLs, and private queries are excluded from the public-facing analysis.
-- Final reported numbers are based on the fresh capstone notebook evaluation.
+- Evaluation results are based on the fresh capstone notebook evaluation, and the final ranked artifact is produced after evaluation by refitting the selected model on the full eligible population.
